@@ -1,64 +1,52 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-
+const express = require('express');
+const bodyParser = require('body-parser');
+const sqlite3 = require('sqlite3').verbose();
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
 
-// USSD endpoint
-app.post("/ussd", (req, res) => {
-  const { sessionId = "", serviceCode = "", phoneNumber = "", text = "" } = req.body;
+const db = new sqlite3.Database('./ussd.db');
 
-  const textArray = text.split("*");
-  const level = textArray.length;
+app.post('/ussd', (req, res) => {
+    const { sessionId, phoneNumber, text } = req.body;
+    const input = text.split('*');
+    const level = input.length;
+    let response = '';
 
-  let response = "";
+    // Save session if new
+    db.get("SELECT * FROM sessions WHERE sessionID = ?", [sessionId], (err, row) => {
+        if (!row) {
+            db.run("INSERT INTO sessions (sessionID, phoneNumber, userInput) VALUES (?, ?, ?)",
+                [sessionId, phoneNumber, text]);
+        } else {
+            db.run("UPDATE sessions SET userInput = ? WHERE sessionID = ?", [text, sessionId]);
+        }
+    });
 
-  if (text === "") {
-    response = "CON Welcome / Murakaza neza!\n";
-    response += "1. English\n";
-    response += "2. Kinyarwanda";
-  } 
-  else if (text === "1") {
-    response = "CON Choose a shoe type:\n";
-    response += "1. Sneakers\n";
-    response += "2. Sandals\n";
-    response += "3. Formal Shoes";
-  } 
-  else if (text === "1*1") {
-    response = "END You chose Sneakers! Perfect for comfort and style.";
-  } 
-  else if (text === "1*2") {
-    response = "END You chose Sandals! Great for sunny days and relaxation.";
-  } 
-  else if (text === "1*3") {
-    response = "END You chose Formal Shoes! Elegant and perfect for events.";
-  } 
-  else if (text === "2") {
-    response = "CON Hitamo ubwoko bw’inkweto:\n";
-    response += "1. Inkweto za siporo (Sneakers)\n";
-    response += "2. Sandali\n";
-    response += "3. Inkweto z’akazi";
-  } 
-  else if (text === "2*1") {
-    response = "END Wahisemo Inkweto za siporo! Ni nziza ku bw'uburyohe n'imyambarire.";
-  } 
-  else if (text === "2*2") {
-    response = "END Wahisemo Sandali! Ni nziza ku minsi y'izuba no kuruhuka.";
-  } 
-  else if (text === "2*3") {
-    response = "END Wahisemo Inkweto z’akazi! Birakwiriye cyane mu birori no mu kazi.";
-  } 
-  else {
-    response = "END Icyo wahisemo ntikibaho. Ongera ugerageze.";
-  }
+    // Language Selection
+    if (text === '') {
+        response = `CON Welcome / Karibu\n1. English\n2. Swahili`;
+    } else if (text === '1') {
+        response = `CON Main Menu:\n1. Buy Shoes\n2. View Orders\n0. Back`;
+    } else if (text === '2') {
+        response = `CON Menyu Kuu:\n1. Nunua Viatu\n2. Angalia Oda\n0. Rudi`;
+    } else if (text === '1*1' || text === '2*1') {
+        response = `CON Choose Shoe:\n1. Nike\n2. Adidas`;
+    } else if (level === 3) {
+        response = `CON Enter quantity:`;
+    } else if (level === 4) {
+        const shoe_model = input[2] === '1' ? 'Nike' : 'Adidas';
+        const quantity = parseInt(input[3]);
 
-  res.set("Content-Type", "text/plain");
-  res.send(response);
+        db.run(`INSERT INTO transactions (phoneNumber, shoe_model, quantity) VALUES (?, ?, ?)`,
+            [phoneNumber, shoe_model, quantity]);
+
+        response = `END Order for ${quantity} ${shoe_model}(s) received. Thank you!`;
+    } else {
+        response = `END Invalid input. Try again.`;
+    }
+
+    res.set('Content-Type', 'text/plain');
+    res.send(response);
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`USSD app running on port ${PORT}`);
-});
+app.listen(3000, () => console.log("USSD app running on port 3000"));

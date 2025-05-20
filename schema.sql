@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS sessions (
+  sessionID TEXT PRIMARY KEY,
+  phoneNumber TEXT,
+  userInput TEXT,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sessionID TEXT,
+  phoneNumber TEXT,
+  shoeType TEXT,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
